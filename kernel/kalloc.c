@@ -80,3 +80,20 @@ kalloc(void)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
 }
+
+//kmem stays local meaning i have to do it here, accessing kmem.freelist
+//similar to kalloc
+int
+count_page(void){
+  int counter = 0;
+  struct run *r;
+  acquire(&kmem.lock);
+  //basically iterate thru freelist + counting
+  r = kmem.freelist;
+  while(r != 0) {
+    counter++;
+    r = r->next;
+  }
+  release(&kmem.lock);
+  return counter;
+}
