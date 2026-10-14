@@ -150,11 +150,8 @@ syscall(void)
     // and store its return value in p->trapframe->a0
     p->trapframe->a0 = syscalls[num]();
 
-    // if syscall is sysinfo/procinfo, ignore counter
-    if (num != SYS_sysinfo && num != SYS_procinfo) {
-      syscall_number++; // increment total syscall counter
-      p->num_calls++; // increment process syscall counter
-    }
+    syscall_number++; // increment total syscall counter
+    p->num_calls++; // increment process syscall counter
     
   } else {
     printf("%d %s: unknown sys call %d\n",

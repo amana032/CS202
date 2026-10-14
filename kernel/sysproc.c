@@ -106,3 +106,4 @@ sys_procinfo(void)
   argaddr(0, (uint64*)&in);
   return procinfo(in);
 }
+
