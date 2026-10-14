@@ -743,7 +743,7 @@ procinfo(struct pinfo *in)
     info.syscall_count = 0;
     info.page_usage = 0;
 
-    acquire(&wait_lock); // use wait_lock to stop parents from getting lost 
+    acquire(&p->lock); // lock the current process
 
     // PPID
     if (p->parent != 0) { // if parent exists, replace 0 with parent pid
@@ -756,7 +756,7 @@ procinfo(struct pinfo *in)
     // PAGE_USAGE
     info.page_usage = (p->sz + PGSIZE - 1) / PGSIZE; // page size in pages 
 
-    release(&wait_lock); // all done looking at processes! unlock table
+    release(&p->lock);
 
     /*
     p->pagetable: current process's page table

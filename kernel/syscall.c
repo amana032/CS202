@@ -142,8 +142,6 @@ syscall(void)
   struct proc *p = myproc();
 
   num = p->trapframe->a7; //obtain system call numebr..?
-  
-  
 
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     // Use num to lookup the system call function for num, call it,
