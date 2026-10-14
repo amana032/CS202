@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "pinfo.h"
 
 struct cpu cpus[NCPU];
 
@@ -145,6 +146,9 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+
+  // Initialize system call counter
+  p->num_calls = 0;
 
   return p;
 }
@@ -680,4 +684,96 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+
+// system: print info
+int sysinfo(int param)
+{
+  int counter = 0;
+  
+  if(param == 0){ // return number of active processes(ready, running, waiting, zombie)
+    struct proc *p;
+    for(p = proc; p < &proc[NPROC]; p++){ //thru all process
+      acquire(&p->lock);
+      if (p->state == RUNNABLE || p->state == RUNNING || p->state == SLEEPING || p->state == ZOMBIE) { //(ready, running, waiting, or zombie)
+        counter++;
+      }
+      release(&p->lock);
+    }
+    return counter;
+  }
+  else if(param == 1){ // return number of system call(don't include this one)
+    extern int syscall_number; // from syscall.c
+    return syscall_number;
+  }
+  else if(param == 2){ // return number of free memory page
+    //requires kmem.freelist from kalloc, count_page returns the page count.
+    int page_count = count_page();
+    if(page_count < 0)
+    {
+      return -1;
+    }else
+    {
+      return page_count;
+    }
+    //uint64 sz;
+    // struct proc *p;
+    // for(p = proc; p < &proc[NPROC]; p++){ //thru all process, not physical
+    //   acquire(&p->lock);
+    //   if (p->state != USED) {
+    //     page_count += (p->sz) / PGSIZE;
+    //   }
+      
+    //   release(&p->lock);
+    // }
+  } 
+   return -1; // error
+}
+
+int
+procinfo(struct pinfo *in)
+{
+  struct pinfo info;
+  struct proc *p = myproc();
+
+  if (in != 0 && p != 0) { // return error if in is invalid, no process exists
+    // defaults 
+    info.ppid = 0; 
+    info.syscall_count = 0;
+    info.page_usage = 0;
+
+    acquire(&wait_lock); // use wait_lock to stop parents from getting lost 
+
+    // PPID
+    if (p->parent != 0) { // if parent exists, replace 0 with parent pid
+      info.ppid = p->parent->pid;
+    } 
+
+    // SYSCALL_COUNT
+    info.syscall_count = p->num_calls;
+
+    // PAGE_USAGE
+    info.page_usage = (p->sz + PGSIZE - 1) / PGSIZE; // page size in pages 
+
+    release(&wait_lock); // all done looking at processes! unlock table
+
+    /*
+    p->pagetable: current process's page table
+    (uint64)in: dest address in user space (where we will write)
+    (char *)&info: source address in kernel space (where the info is stored)
+    sizeof(info): # of bytes to copy
+    */
+
+    if(copyout(p->pagetable, (uint64)in, (char *)&info, sizeof(info)) < 0) { // if copyout fails, return error
+      return -1;
+
+    } 
+
+    return 0; // should be good
+
+  }
+
+  return -1;
+
 }

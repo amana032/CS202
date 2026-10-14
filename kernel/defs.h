@@ -4,6 +4,7 @@ struct file;
 struct inode;
 struct pipe;
 struct proc;
+struct pinfo;
 struct spinlock;
 struct sleeplock;
 struct stat;
@@ -63,6 +64,7 @@ void            ramdiskrw(struct buf*);
 void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
+int             count_page(void);
 
 // log.c
 void            initlog(int, struct superblock*);
@@ -140,6 +142,8 @@ void            argaddr(int, uint64 *);
 int             fetchstr(uint64, char*, int);
 int             fetchaddr(uint64, uint64*);
 void            syscall();
+int             sysinfo(int);
+int             procinfo(struct pinfo*);
 
 // trap.c
 extern uint     ticks;

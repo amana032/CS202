@@ -101,6 +101,8 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_link(void);
 extern uint64 sys_mkdir(void);
 extern uint64 sys_close(void);
+extern uint64 sys_info(void);
+extern uint64 sys_procinfo(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -126,7 +128,12 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_sysinfo] sys_info,
+[SYS_procinfo] sys_procinfo,
 };
+
+//global counter(not efficient...)
+int syscall_number = 0;
 
 void
 syscall(void)
@@ -134,11 +141,21 @@ syscall(void)
   int num;
   struct proc *p = myproc();
 
-  num = p->trapframe->a7;
+  num = p->trapframe->a7; //obtain system call numebr..?
+  
+  
+
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     // Use num to lookup the system call function for num, call it,
     // and store its return value in p->trapframe->a0
     p->trapframe->a0 = syscalls[num]();
+
+    // if syscall is sysinfo/procinfo, ignore counter
+    if (num != SYS_sysinfo && num != SYS_procinfo) {
+      syscall_number++; // increment total syscall counter
+      p->num_calls++; // increment process syscall counter
+    }
+    
   } else {
     printf("%d %s: unknown sys call %d\n",
             p->pid, p->name, num);
