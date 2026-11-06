@@ -148,7 +148,10 @@ found:
   p->context.sp = p->kstack + PGSIZE;
 
   // Initialize system call counter
-  p->num_calls = 0;
+  p->num_calls = 0; 
+
+  // Initialize tickets to 10000
+  p->tickets = 10000;
 
   return p;
 }
@@ -438,6 +441,15 @@ wait(uint64 addr)
   }
 }
 
+// pseudo random generator (https://stackoverflow.com/a/7603688)
+unsigned short lfsr = 0xACE1u;
+unsigned short bit;
+unsigned short rand()
+{
+  bit = ((lfsr >> 0) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 5)) & 1;
+  return lfsr = (lfsr >> 1) | (bit << 15);
+}
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -445,35 +457,92 @@ wait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+
+// Scheduler will use either lottery, stride, or round robin!
 void
 scheduler(void)
 {
-  struct proc *p;
-  struct cpu *c = mycpu();
-  
-  c->proc = 0;
-  for(;;){
-    // Avoid deadlock by ensuring that devices can interrupt.
-    intr_on();
+    struct proc *p;
+    struct cpu *c = mycpu();
 
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
+    c->proc = 0;
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-      }
-      release(&p->lock);
+    for(;;) {
+        intr_on();
+
+        #if defined(LOTTERY)
+          // Get total tickets
+          int ticket_total = 0;
+
+          for(p = proc; p < &proc[NPROC]; p++) { // For every process, if it can run add tickets to the total
+              acquire(&p->lock);
+              if(p->state == RUNNABLE) {
+                  ticket_total += p->tickets;
+              }
+              release(&p->lock);
+          }
+
+          if (ticket_total == 0) { // No runnable processes, don't lottery
+            continue;
+          }
+
+          // Lottery time
+          int winner = rand() % ticket_total; 
+          int ticket_iter = winner;
+
+          for (p = proc; p < &proc[NPROC]; p++) {
+            acquire(&p->lock);
+
+            if (p->state == RUNNABLE) {
+              ticket_iter -= p->tickets;
+
+              if (ticket_iter <= 0) { // Reached the winner!
+                // Switch to chosen process.  It is the process's job
+                // to release its lock and then reacquire it
+                // before jumping back to us.
+                p->state = RUNNING;
+                c->proc = p;
+                swtch(&c->context, &p->context);
+
+                // Process is done running for now.
+                // It should have changed its p->state before coming back.
+                c->proc = 0;
+
+                p->num_scheduled++; // Increment schedule count for the ran process (our winner)
+                break; // Stop looking for other processes
+              }
+            }
+            release(&p->lock);
+          }
+        
+        #elif defined(STRIDE)
+
+            // TODO: Stride scheduling
+
+        #else
+          // Copy and pasted original round robin method
+            for(p = proc; p < &proc[NPROC]; p++) {
+              acquire(&p->lock);
+              if(p->state == RUNNABLE) {
+                // Switch to chosen process.  It is the process's job
+                // to release its lock and then reacquire it
+                // before jumping back to us.
+                p->state = RUNNING;
+                c->proc = p;
+                swtch(&c->context, &p->context);
+
+                // Process is done running for now.
+                // It should have changed its p->state before coming back.
+                c->proc = 0;
+                p->num_scheduled++; // Increment schedule count for the ran process
+              }
+              release(&p->lock);
+            }
+
+        #endif
     }
-  }
 }
+
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -717,16 +786,6 @@ int sysinfo(int param)
     {
       return page_count;
     }
-    //uint64 sz;
-    // struct proc *p;
-    // for(p = proc; p < &proc[NPROC]; p++){ //thru all process, not physical
-    //   acquire(&p->lock);
-    //   if (p->state != USED) {
-    //     page_count += (p->sz) / PGSIZE;
-    //   }
-      
-    //   release(&p->lock);
-    // }
   } 
    return -1; // error
 }
@@ -765,15 +824,31 @@ procinfo(struct pinfo *in)
     sizeof(info): # of bytes to copy
     */
 
-    if(copyout(p->pagetable, (uint64)in, (char *)&info, sizeof(info)) < 0) { // if copyout fails, return error
+    if (copyout(p->pagetable, (uint64)in, (char *)&info, sizeof(info)) < 0) { // if copyout fails, return error
       return -1;
-
     } 
 
     return 0; // should be good
-
   }
 
   return -1;
+}
 
+int
+sched_statistics(void)
+{
+    struct proc *p;
+
+    for (p = proc; p < &proc[NPROC]; p++) { 
+        acquire(&p->lock);
+
+        // 1) PID, 2) name in a parenthesis, 3) the ticket value, and 4) the number of times it has been scheduled to run 
+        if (p->state != UNUSED) { // skip empty slots
+            printf("%d (%s): tickets: %d, ticks: %d\n", p->pid, p->name, p->tickets, p->num_scheduled);
+        }
+
+        release(&p->lock);
+    }
+
+    return 0;
 }

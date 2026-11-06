@@ -142,8 +142,9 @@ void            argaddr(int, uint64 *);
 int             fetchstr(uint64, char*, int);
 int             fetchaddr(uint64, uint64*);
 void            syscall();
-int             sysinfo(int);
-int             procinfo(struct pinfo*);
+int             sysinfo(int); 
+int             procinfo(struct pinfo*); 
+int             sched_statistics(void);
 
 // trap.c
 extern uint     ticks;

@@ -91,8 +91,9 @@ sys_uptime(void)
   return xticks;
 }
 
+// kernel side of function, calls more detailed from proc.c
 uint64
-sys_info(void)
+sys_info(void) 
 {
   int p;
   argint(0, &p);
@@ -100,7 +101,7 @@ sys_info(void)
 }
 
 uint64
-sys_procinfo(void)
+sys_procinfo(void) 
 {
   struct pinfo *in;
   argaddr(0, (uint64*)&in);

@@ -105,6 +105,13 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
+  // LAB 1
   // custom int to hold number of system calls 
   int num_calls;
+
+  // LAB 2
+  // custom int to hold tickets
+  int tickets;
+  // custom int to hold times it's been scheduled
+  int num_scheduled;
 };
