@@ -145,6 +145,7 @@ void            syscall();
 int             sysinfo(int); 
 int             procinfo(struct pinfo*); 
 int             sched_statistics(void);
+int             sched_tickets(int);
 
 // trap.c
 extern uint     ticks;

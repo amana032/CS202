@@ -108,3 +108,19 @@ sys_procinfo(void)
   return procinfo(in);
 }
 
+// lab2
+// not sure if it was defined elsewhere - Suanna
+uint64
+sys_sched_statistics(void)
+{
+  return sched_statistics();
+}
+
+uint64
+sys_sched_tickets(void)
+{
+  int value;
+  argint(0, &value);
+  return sched_tickets(value);
+}
+

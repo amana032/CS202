@@ -153,6 +153,11 @@ found:
   // Initialize tickets to 10000
   p->tickets = 10000;
 
+  // Initialize stride to 0
+  p->stride = 0;
+  // Initialize pass to 0
+  p->pass = 0;
+
   return p;
 }
 
@@ -473,7 +478,6 @@ scheduler(void)
         #if defined(LOTTERY)
           // Get total tickets
           int ticket_total = 0;
-
           for(p = proc; p < &proc[NPROC]; p++) { // For every process, if it can run add tickets to the total
               acquire(&p->lock);
               if(p->state == RUNNABLE) {
@@ -509,6 +513,7 @@ scheduler(void)
                 c->proc = 0;
 
                 p->num_scheduled++; // Increment schedule count for the ran process (our winner)
+                release(&p->lock);
                 break; // Stop looking for other processes
               }
             }
@@ -516,8 +521,44 @@ scheduler(void)
           }
         
         #elif defined(STRIDE)
+          struct proc *p_new = 0; // process placeholder
 
-            // TODO: Stride scheduling
+            // Stride scheduling
+            // Calculate stride for each process
+            // Stride is inversely proportional to tickets
+            // And finding process with lowest pass, update to the placeholder
+            for(p = proc; p < &proc[NPROC]; p++) {
+              acquire(&p->lock);
+              if(p->state == RUNNABLE) {
+                  p->stride = 10000 / p->tickets;
+                  if(p_new == 0 || p_new->pass > p->pass) {
+                  p_new = p;           
+                }   
+              }
+              release(&p->lock);
+            }
+
+            // If lowest pass process is found, switch to that process
+            if(p_new != 0) {
+              acquire(&p_new->lock);
+              if(p_new->state == RUNNABLE) {
+               // Switch to chosen process.  It is the process's job
+                // to release its lock and then reacquire it
+                // before jumping back to us.
+                p_new->state = RUNNING;
+                c->proc = p_new;
+                p_new->pass += p_new->stride;
+                
+                swtch(&c->context, &p_new->context);
+
+                // Process is done running for now.
+                // It should have changed its p->state before coming back.
+                c->proc = 0;
+                p_new->num_scheduled++;
+              }
+              release(&p_new->lock);
+            }
+            
 
         #else
           // Copy and pasted original round robin method
@@ -844,11 +885,28 @@ sched_statistics(void)
 
         // 1) PID, 2) name in a parenthesis, 3) the ticket value, and 4) the number of times it has been scheduled to run 
         if (p->state != UNUSED) { // skip empty slots
-            printf("%d (%s): tickets: %d, ticks: %d\n", p->pid, p->name, p->tickets, p->num_scheduled);
+          printf("%d (%s): tickets: %d, ticks: %d\n", p->pid, p->name, p->tickets, p->num_scheduled);
         }
 
         release(&p->lock);
     }
 
     return 0;
+}
+
+int sched_tickets(int new_ticket_value)
+{
+  struct proc *p = myproc();
+  acquire(&p->lock);
+  if(new_ticket_value > 10000)
+  {
+    panic("Ticket maximum cannot exceed 10,000.\n");  // error message    
+  }else {
+    p->tickets = new_ticket_value;
+    //printf("Testing: Tickets: %d, stride: %d, pass: %d\n", p->tickets, p->stride, p->pass);
+  }
+
+  release(&p->lock);
+
+  return 0;
 }

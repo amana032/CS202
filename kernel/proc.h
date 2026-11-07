@@ -114,4 +114,9 @@ struct proc {
   int tickets;
   // custom int to hold times it's been scheduled
   int num_scheduled;
+  // interval between selections
+  // measured in passes
+  int stride;
+  // virtual time
+  int pass;
 };
