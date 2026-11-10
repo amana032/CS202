@@ -491,7 +491,7 @@ scheduler(void)
           }
 
           // Lottery time
-          int winner = rand() % ticket_total; 
+          int winner = rand() % ticket_total + 1; 
           int ticket_iter = winner;
 
           for (p = proc; p < &proc[NPROC]; p++) {
